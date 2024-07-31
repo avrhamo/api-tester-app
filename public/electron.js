@@ -1,10 +1,7 @@
-const electron = require('electron');
-const app = electron.app;
-const BrowserWindow = electron.BrowserWindow;
+const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
 const isDev = require('electron-is-dev');
-
-require('../src/electron/ipc-handler');
+const { connectToDatabase, listDatabases, listCollections, handleGetCollectionFields } = require('../src/electron/ipc-handler');
 
 let mainWindow;
 
@@ -13,10 +10,10 @@ function createWindow() {
     width: 900,
     height: 680,
     webPreferences: {
-      nodeIntegration: false,
-      contextIsolation: true,
-      preload: path.join(__dirname, 'preload.js')
-    }
+      nodeIntegration: true,
+      contextIsolation: false,
+      enableRemoteModule: true,
+    },
   });
 
   mainWindow.loadURL(
@@ -46,3 +43,26 @@ app.on('activate', () => {
   }
 });
 
+ipcMain.handle('connect-to-database', async (event, connectionString) => {
+  return connectToDatabase(connectionString);
+});
+
+ipcMain.handle('list-databases', async () => {
+  return listDatabases();
+});
+
+ipcMain.handle('list-collections', async (event, dbName) => {
+  return listCollections(dbName);
+});
+
+ipcMain.handle('get-collection-fields', async (event, args) => {
+  console.log('Received get-collection-fields request with args:', args);
+  try {
+    const result = await handleGetCollectionFields(args);
+    console.log('handleGetCollectionFields result:', result);
+    return result;
+  } catch (error) {
+    console.error('Error in get-collection-fields handler:', error);
+    throw error;
+  }
+});

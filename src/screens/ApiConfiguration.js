@@ -39,11 +39,24 @@ function ApiConfiguration({ selectedCollection, setApiConfig }) {
   const [error, setError] = useState('');
   const history = useHistory();
 
+
   useEffect(() => {
-    if (selectedCollection) {
-      fetchCollectionFields();
-    }
+    const fetchFields = async () => {
+      if (selectedCollection && selectedCollection.database && selectedCollection.collection) {
+        console.log('Fetching fields for:', selectedCollection);
+        try {
+          const fields = await getCollectionFields(selectedCollection.database, selectedCollection.collection);
+          console.log('Fetched fields:', fields);
+          setCollectionFields(fields);
+        } catch (error) {
+          console.error('Error fetching collection fields:', error);
+          // Handle error (e.g., show an error message to the user)
+        }
+      }
+    };
+    fetchFields();
   }, [selectedCollection]);
+
 
   const fetchCollectionFields = async () => {
     setIsLoading(true);
@@ -115,6 +128,8 @@ function ApiConfiguration({ selectedCollection, setApiConfig }) {
       }
     }));
   };
+
+
 
   const handleSubmit = () => {
     const config = {
