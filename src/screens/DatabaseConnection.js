@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useHistory } from 'react-router-dom';
 import { TextField, Button, Typography, Box, CircularProgress, Alert } from '@mui/material';
 import { connectToDatabase } from '../services/databaseService';
@@ -6,10 +6,10 @@ import { connectToDatabase } from '../services/databaseService';
 function DatabaseConnection({ setIsConnected }) {
   const [connectionString, setConnectionString] = useState('');
   const [isConnecting, setIsConnecting] = useState(false);
-  const [error, setError] = useState('');  // Add this line
+  const [error, setError] = useState('');
   const history = useHistory();
 
-  const handleConnect = async () => {
+  const handleConnect = useCallback(async () => {
     setIsConnecting(true);
     setError('');
     try {
@@ -21,6 +21,19 @@ function DatabaseConnection({ setIsConnected }) {
       console.error(err);
     } finally {
       setIsConnecting(false);
+    }
+  }, [connectionString, history, setIsConnected]);
+
+  useEffect(() => {
+    let isMounted = true;
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const safeSetter = (setter) => (...args) => {
+    if (isMounted) {
+      setter(...args);
     }
   };
 

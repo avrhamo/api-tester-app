@@ -1,0 +1,18 @@
+
+
+mongodb+srv://m001-student:avimongo675@sandbox.aeaa1.mongodb.net/test
+
+
+
+curl --location --request GET 'http://localhost:8080/api/complexEndpoint?param1=value1&param2=value2' \
+--header 'Content-Type: application/json' \
+--header 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c' \
+--data-raw '{
+    "name": "John Doe",
+    "email": "john.doe@example.com",
+    "age": 30,
+    "preferences": {
+        "newsletter": true,
+        "notifications": "email"
+    }
+}'
