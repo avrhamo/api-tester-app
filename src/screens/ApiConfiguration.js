@@ -39,84 +39,79 @@ function ApiConfiguration({ selectedCollection, setApiConfig }) {
   const [error, setError] = useState('');
   const history = useHistory();
 
-
   useEffect(() => {
     const fetchFields = async () => {
       if (selectedCollection && selectedCollection.database && selectedCollection.collection) {
-        console.log('Fetching fields for:', selectedCollection);
+        setIsLoading(true);
+        setError('');
         try {
+          console.log('Fetching fields for:', selectedCollection);
           const fields = await getCollectionFields(selectedCollection.database, selectedCollection.collection);
           console.log('Fetched fields:', fields);
           setCollectionFields(fields);
-        } catch (error) {
-          console.error('Error fetching collection fields:', error);
-          // Handle error (e.g., show an error message to the user)
+        } catch (err) {
+          console.error('Error fetching collection fields:', err);
+          setError('Failed to fetch collection fields: ' + err.message);
+        } finally {
+          setIsLoading(false);
         }
       }
     };
     fetchFields();
   }, [selectedCollection]);
 
-
-  const fetchCollectionFields = async () => {
-    setIsLoading(true);
-    setError('');
-    try {
-      const fields = await getCollectionFields(selectedCollection.database, selectedCollection.collection);
-      setCollectionFields(fields);
-    } catch (err) {
-      setError('Failed to fetch collection fields: ' + err.message);
-      console.error('Error fetching collection fields:', err);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const flattenObject = (obj, prefix = '') => {
-    return Object.keys(obj).reduce((acc, k) => {
-      const pre = prefix.length ? `${prefix}.` : '';
-      if (typeof obj[k] === 'object' && obj[k] !== null && !Array.isArray(obj[k])) {
-        Object.assign(acc, flattenObject(obj[k], `${pre}${k}`));
-      } else {
-        acc[`${pre}${k}`] = obj[k];
-      }
-      return acc;
-    }, {});
-  };
-
   const handleParseCurl = () => {
-    console.log('Parsing curl command:', curlCommand);
-    const parsed = parseCurlCommand(curlCommand);
-    console.log('Parsed curl command:', parsed);
+    try {
+      const parsed = parseCurlCommand(curlCommand);
+      console.log('Parsed curl command:', parsed);
 
-    const updatedParsed = { ...parsed, urlParams: parsed.queryParams || {} };
-    console.log('Updated parsed command with URL params:', updatedParsed);
-    setParsedCommand(updatedParsed);
-    
-    // Initialize field mappings
-    const initialMappings = {
-      urlParams: {},
-      headers: {},
-      body: {},
-    };
-    Object.keys(updatedParsed.urlParams).forEach(key => {
-      initialMappings.urlParams[key] = '';
-    });
-    Object.keys(parsed.headers || {}).forEach(key => {
-      initialMappings.headers[key] = '';
-    });
-    if (typeof parsed.data === 'object' && parsed.data !== null) {
-      const flattenedBody = flattenObject(parsed.data);
-      Object.keys(flattenedBody).forEach(key => {
-        initialMappings.body[key] = '';
-      });
+      setParsedCommand(parsed);
+      
+      // Initialize field mappings
+      const initialMappings = {
+        urlParams: {},
+        headers: {},
+        body: {},
+      };
+      
+      if (parsed.queryParams) {
+        Object.keys(parsed.queryParams).forEach(key => {
+          initialMappings.urlParams[key] = '';
+        });
+      }
+      
+      if (parsed.headers) {
+        Object.keys(parsed.headers).forEach(key => {
+          initialMappings.headers[key] = '';
+        });
+      }
+      
+      if (parsed.data && typeof parsed.data === 'object') {
+        const flattenObject = (obj, prefix = '') => {
+          return Object.keys(obj).reduce((acc, k) => {
+            const pre = prefix.length ? `${prefix}.` : '';
+            if (typeof obj[k] === 'object' && obj[k] !== null && !Array.isArray(obj[k])) {
+              Object.assign(acc, flattenObject(obj[k], `${pre}${k}`));
+            } else {
+              acc[`${pre}${k}`] = '';
+            }
+            return acc;
+          }, {});
+        };
+        
+        const flattenedBody = flattenObject(parsed.data);
+        Object.assign(initialMappings.body, flattenedBody);
+      }
+      
+      console.log('Initial field mappings:', initialMappings);
+      setFieldMappings(initialMappings);
+
+      // Set debug info
+      setDebugInfo(JSON.stringify({ parsed, mappings: initialMappings }, null, 2));
+    } catch (error) {
+      console.error('Error parsing curl command:', error);
+      setError('Failed to parse curl command: ' + error.message);
     }
-    
-    console.log('Initial field mappings:', initialMappings);
-    setFieldMappings(initialMappings);
-
-    // Set debug info
-    setDebugInfo(JSON.stringify({ parsed: updatedParsed, mappings: initialMappings }, null, 2));
   };
 
   const handleFieldMappingChange = (section, curlField, collectionField) => {
@@ -128,8 +123,6 @@ function ApiConfiguration({ selectedCollection, setApiConfig }) {
       }
     }));
   };
-
-
 
   const handleSubmit = () => {
     const config = {
@@ -143,7 +136,6 @@ function ApiConfiguration({ selectedCollection, setApiConfig }) {
 
   const renderMappingTable = (section) => {
     const sectionData = fieldMappings[section] || {};
-    console.log(`Rendering mapping table for ${section}:`, sectionData);
     return (
       <TableContainer>
         <Table>
