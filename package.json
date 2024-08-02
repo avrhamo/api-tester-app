@@ -10,7 +10,8 @@
     "electron-build": "electron-builder",
     "build": "npm run react-build && npm run electron-build",
     "test": "react-app-rewired test",
-    "eject": "react-scripts eject"
+    "eject": "react-scripts eject",
+    "debug": "concurrently \"cross-env BROWSER=none npm run react-start\" \"wait-on http://localhost:3000 && electron --inspect=5858 .\""
   },
   "author": "Avraham Ayele",
   "license": "ISC",

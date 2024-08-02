@@ -68,7 +68,6 @@ function setupIpcHandlers() {
     try {
       const db = client.db(database);
       const coll = db.collection(collection);
-      // Fetch a random document
       const data = await coll.aggregate([{ $sample: { size: 1 } }]).toArray();
       return data;
     } catch (error) {
@@ -90,15 +89,6 @@ function setupIpcHandlers() {
           'Content-Type': 'application/json',
         },
       };
-      
-      ipcMain.handle('fetch-collection-data', async (event, dbName, collectionName, limit = 100) => {
-        if (!client) {
-          throw new Error('Not connected to a database');
-        }
-        const db = client.db(dbName);
-        const collection = db.collection(collectionName);
-        return await collection.find().limit(limit).toArray();
-      });
 
       const req = (parsedUrl.protocol === 'https:' ? https : http).request(options, (res) => {
         let responseBody = '';
@@ -138,6 +128,15 @@ function setupIpcHandlers() {
       }
     }
     return { success: false, error: 'Not connected to a database' };
+  });
+
+  ipcMain.handle('fetch-collection-data', async (event, dbName, collectionName, limit = 100) => {
+    if (!client) {
+      throw new Error('Not connected to a database');
+    }
+    const db = client.db(dbName);
+    const collection = db.collection(collectionName);
+    return await collection.find().limit(limit).toArray();
   });
 }
 

@@ -17,18 +17,27 @@ const mapDataToRequest = (mongoData, fieldMappings) => {
     body: {}
   };
 
-  Object.entries(fieldMappings).forEach(([apiField, dbField]) => {
-    if (dbField && mongoData[dbField] !== undefined) {
-      const [section, field] = apiField.split('.');
-      if (section === 'queryParams' || section === 'headers') {
-        mappedData[section][field] = mongoData[dbField];
-      } else {
-        // Assume it's a body field if not specified
-        mappedData.body[field || apiField] = mongoData[dbField];
-      }
+  console.log('Field Mappings:', fieldMappings);
+  console.log('Mongo Data:', mongoData);
+
+  Object.entries(fieldMappings).forEach(([section, mappings]) => {
+    if (!mappedData[section]) {
+      console.error(`Section ${section} is not defined in mappedData`);
+      return;
     }
+    Object.entries(mappings).forEach(([apiField, dbField]) => {
+      if (dbField && mongoData[dbField] !== undefined) {
+        if (section === 'urlParams' || section === 'headers') {
+          mappedData[section][apiField] = mongoData[dbField];
+        } else {
+          // Assume it's a body field if not specified
+          mappedData.body[apiField] = mongoData[dbField];
+        }
+      }
+    });
   });
 
+  console.log('Mapped Data:', mappedData);
   return mappedData;
 };
 
@@ -126,6 +135,7 @@ export const executeApiTest = async (apiConfig, testParams) => {
   };
 
   const requests = Array(numRequests).fill().map(() => enqueue(executeRequest));
+
   await Promise.all(requests);
 
   results.avgResponseTime = results.responseTimes.reduce((a, b) => a + b, 0) / numRequests;

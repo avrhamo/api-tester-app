@@ -1,0 +1,9 @@
+{
+    "name": "John Doe",
+    "email": "john.doe@example.com",
+    "age": 30,
+    "preferences": {
+        "newsletter": true,
+        "notifications": "email"
+    }
+}

@@ -20,14 +20,22 @@ import {
   Tabs,
   Tab,
   CircularProgress,
+  Switch,
+  FormControlLabel
 } from '@mui/material';
 import { parseCurlCommand } from '../utils/curlParser';
 import { getCollectionFields } from '../services/databaseService';
 
-function ApiConfiguration({ selectedCollection, setApiConfig }) {
+function ApiConfiguration({ selectedCollection, setApiConfig}) {
   const [curlCommand, setCurlCommand] = useState('');
+  const [filterText, setFilterText] = useState('');
   const [parsedCommand, setParsedCommand] = useState(null);
   const [fieldMappings, setFieldMappings] = useState({
+    urlParams: {},
+    headers: {},
+    body: {},
+  });
+  const [useFixedValue, setUseFixedValue] = useState({
     urlParams: {},
     headers: {},
     body: {},
@@ -38,6 +46,14 @@ function ApiConfiguration({ selectedCollection, setApiConfig }) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const history = useHistory();
+
+  const handleFilterChange = (e) => {
+    setFilterText(e.target.value);
+  };
+
+  const filteredFields = collectionFields.filter((field) =>
+    field.toLowerCase().includes(filterText.toLowerCase())
+  );
 
   useEffect(() => {
     const fetchFields = async () => {
@@ -62,28 +78,35 @@ function ApiConfiguration({ selectedCollection, setApiConfig }) {
     try {
       const parsed = parseCurlCommand(curlCommand);
       console.log('Parsed curl command:', parsed);
-
       setParsedCommand(parsed);
-      
+  
       // Initialize field mappings
       const initialMappings = {
         urlParams: {},
         headers: {},
         body: {},
       };
-      
+
+      const initialUseFixedValue = {
+        urlParams: {},
+        headers: {},
+        body: {},
+      };
+
       if (parsed.queryParams) {
         Object.keys(parsed.queryParams).forEach(key => {
-          initialMappings.urlParams[key] = '';
+          initialMappings.urlParams[key] = { collectionField: '' };
+          initialUseFixedValue.urlParams[key] = false;
         });
       }
-      
+  
       if (parsed.headers) {
         Object.keys(parsed.headers).forEach(key => {
-          initialMappings.headers[key] = '';
+          initialMappings.headers[key] = { collectionField: '' };
+          initialUseFixedValue.headers[key] = false;
         });
       }
-      
+  
       if (parsed.data && typeof parsed.data === 'object') {
         const flattenObject = (obj, prefix = '') => {
           return Object.keys(obj).reduce((acc, k) => {
@@ -91,38 +114,42 @@ function ApiConfiguration({ selectedCollection, setApiConfig }) {
             if (typeof obj[k] === 'object' && obj[k] !== null && !Array.isArray(obj[k])) {
               Object.assign(acc, flattenObject(obj[k], `${pre}${k}`));
             } else {
-              acc[`${pre}${k}`] = '';
+              acc[`${pre}${k}`] = { collectionField: '' };
             }
             return acc;
           }, {});
         };
-        
+  
         const flattenedBody = flattenObject(parsed.data);
         Object.assign(initialMappings.body, flattenedBody);
+        Object.keys(flattenedBody).forEach(key => {
+          initialUseFixedValue.body[key] = false;
+        });
       }
-      
+  
       console.log('Initial field mappings:', initialMappings);
       setFieldMappings(initialMappings);
-
-      // Set debug info
-      setDebugInfo(JSON.stringify({ parsed, mappings: initialMappings }, null, 2));
+      setUseFixedValue(initialUseFixedValue);
+      setDebugInfo(JSON.stringify({ parsed, mappings: initialMappings, useFixedValue: initialUseFixedValue }, null, 2));
     } catch (error) {
       console.error('Error parsing curl command:', error);
       setError('Failed to parse curl command: ' + error.message);
     }
   };
 
-  const handleFieldMappingChange = (section, curlField, collectionField) => {
+  const handleFieldMappingChange = (section, curlField, value, isFixedValue = false) => {
     setFieldMappings(prev => ({
       ...prev,
       [section]: {
         ...prev[section],
-        [curlField]: collectionField
+        [curlField]: isFixedValue ? { fixedValue: value } : { collectionField: value }
       }
     }));
   };
 
   const handleSubmit = () => {
+    console.log('Field Mappings on Submit:', fieldMappings);
+
     const config = {
       ...parsedCommand,
       fieldMappings,
@@ -132,7 +159,19 @@ function ApiConfiguration({ selectedCollection, setApiConfig }) {
     history.push('/execute-test');
   };
 
-  const renderMappingTable = (section) => {
+  const handleUseFixedValueChange = (section, curlField) => {
+    setUseFixedValue(prev => ({
+      ...prev,
+      [section]: {
+        ...prev[section],
+        [curlField]: !prev[section][curlField]
+      }
+    }));
+
+    handleFieldMappingChange(section, curlField, '', !useFixedValue[section][curlField]);
+  };
+
+const renderMappingTable = (section) => {
     const sectionData = fieldMappings[section] || {};
     return (
       <TableContainer>
@@ -140,35 +179,65 @@ function ApiConfiguration({ selectedCollection, setApiConfig }) {
           <TableHead>
             <TableRow>
               <TableCell>Curl Field</TableCell>
-              <TableCell>Collection Field</TableCell>
+              <TableCell>Use Fixed Value</TableCell>
+              <TableCell>Collection Field / Fixed Value</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {Object.keys(sectionData).length === 0 ? (
               <TableRow>
-                <TableCell colSpan={2}>No {section} found</TableCell>
+                <TableCell colSpan={3}>No {section} found</TableCell>
               </TableRow>
             ) : (
-              Object.entries(sectionData).map(([curlField, mappedField]) => (
+              Object.entries(sectionData).map(([curlField, mappedValue]) => (
                 <TableRow key={curlField}>
                   <TableCell>{curlField}</TableCell>
                   <TableCell>
-                    <FormControl fullWidth>
-                      <InputLabel>Collection Field</InputLabel>
-                      <Select
-                        value={mappedField}
-                        onChange={(e) => handleFieldMappingChange(section, curlField, e.target.value)}
-                      >
-                        <MenuItem value="">
-                          <em>None</em>
-                        </MenuItem>
-                        {collectionFields.map((field) => (
-                          <MenuItem key={field} value={field}>
-                            {field}
+                    <FormControlLabel
+                      control={
+                        <Switch
+                          checked={useFixedValue[section][curlField] || false}
+                          onChange={() => handleUseFixedValueChange(section, curlField)}
+                        />
+                      }
+                      label="Fixed Value"
+                    />
+                  </TableCell>
+                  <TableCell>
+                    {useFixedValue[section][curlField] ? (
+                      <TextField
+                        fullWidth
+                        value={mappedValue.fixedValue || ''}
+                        onChange={(e) => handleFieldMappingChange(section, curlField, e.target.value, true)}
+                        placeholder="Enter fixed value"
+                      />
+                    ) : (
+                      <FormControl fullWidth>
+                        <InputLabel>Collection Field</InputLabel>
+                        <Select
+                          value={mappedValue.collectionField || ''}
+                          onChange={(e) => handleFieldMappingChange(section, curlField, e.target.value)}
+                          renderValue={(selected) => selected}
+                        >
+                          <MenuItem>
+                            <TextField
+                              placeholder="Filter..."
+                              value={filterText}
+                              onChange={handleFilterChange}
+                              variant="outlined"
+                              fullWidth
+                              type='search'
+                              onClick={(e) => e.stopPropagation()}
+                            />
                           </MenuItem>
-                        ))}
-                      </Select>
-                    </FormControl>
+                          {filteredFields.map((field) => (
+                            <MenuItem key={field} value={field}>
+                              {field}
+                            </MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
+                    )}
                   </TableCell>
                 </TableRow>
               ))
@@ -178,6 +247,7 @@ function ApiConfiguration({ selectedCollection, setApiConfig }) {
       </TableContainer>
     );
   };
+
 
   if (isLoading) {
     return (
