@@ -1,7 +1,7 @@
 const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
 const isDev = require('electron-is-dev');
-const { connectToDatabase, listDatabases, listCollections, handleGetCollectionFields } = require('../src/electron/ipc-handler');
+const { setupIpcHandlers } = require('../src/electron/ipc-handler');
 
 let mainWindow;
 
@@ -29,7 +29,10 @@ function createWindow() {
   mainWindow.on('closed', () => (mainWindow = null));
 }
 
-app.on('ready', createWindow);
+app.on('ready', () => {
+  createWindow();
+  setupIpcHandlers(ipcMain);
+});
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
@@ -40,29 +43,5 @@ app.on('window-all-closed', () => {
 app.on('activate', () => {
   if (mainWindow === null) {
     createWindow();
-  }
-});
-
-ipcMain.handle('connect-to-database', async (event, connectionString) => {
-  return connectToDatabase(connectionString);
-});
-
-ipcMain.handle('list-databases', async () => {
-  return listDatabases();
-});
-
-ipcMain.handle('list-collections', async (event, dbName) => {
-  return listCollections(dbName);
-});
-
-ipcMain.handle('get-collection-fields', async (event, args) => {
-  console.log('Received get-collection-fields request with args:', args);
-  try {
-    const result = await handleGetCollectionFields(args);
-    console.log('handleGetCollectionFields result:', result);
-    return result;
-  } catch (error) {
-    console.error('Error in get-collection-fields handler:', error);
-    throw error;
   }
 });

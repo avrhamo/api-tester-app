@@ -45,13 +45,11 @@ function ApiConfiguration({ selectedCollection, setApiConfig }) {
         setIsLoading(true);
         setError('');
         try {
-          console.log('Fetching fields for:', selectedCollection);
           const fields = await getCollectionFields(selectedCollection.database, selectedCollection.collection);
-          console.log('Fetched fields:', fields);
           setCollectionFields(fields);
         } catch (err) {
           console.error('Error fetching collection fields:', err);
-          setError('Failed to fetch collection fields: ' + err.message);
+          setError(`Failed to fetch collection fields: ${err.message}`);
         } finally {
           setIsLoading(false);
         }
@@ -202,6 +200,11 @@ function ApiConfiguration({ selectedCollection, setApiConfig }) {
       <Typography variant="h4" component="h1" gutterBottom>
         API Configuration
       </Typography>
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {error}
+        </Alert>
+      )}
       <Paper elevation={3} sx={{ p: 2, mb: 2 }}>
         <TextField
           fullWidth
