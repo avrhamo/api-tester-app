@@ -1,0 +1,16 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        
+      {
+        "name": "Attach to Electron",
+        "type": "node",
+        "request": "attach",
+        "port": 5858,
+        "restart": true,
+        "protocol": "inspector",
+        "timeout": 30000,
+        "stopOnEntry": false
+      }
+    ]
+  }

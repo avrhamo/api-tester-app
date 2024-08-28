@@ -86,23 +86,27 @@ function ApiConfiguration({ selectedCollection, setApiConfig}) {
         headers: {},
         body: {},
       };
-
       const initialUseFixedValue = {
         urlParams: {},
         headers: {},
         body: {},
       };
-
+  
+      // Helper function for auto-matching
+      const autoMatch = (key) => {
+        return collectionFields.find(field => field.toLowerCase() === key.toLowerCase()) || '';
+      };
+  
       if (parsed.queryParams) {
         Object.keys(parsed.queryParams).forEach(key => {
-          initialMappings.urlParams[key] = { collectionField: '' };
+          initialMappings.urlParams[key] = { collectionField: autoMatch(key) };
           initialUseFixedValue.urlParams[key] = false;
         });
       }
   
       if (parsed.headers) {
         Object.keys(parsed.headers).forEach(key => {
-          initialMappings.headers[key] = { collectionField: '' };
+          initialMappings.headers[key] = { collectionField: autoMatch(key) };
           initialUseFixedValue.headers[key] = false;
         });
       }
@@ -114,7 +118,7 @@ function ApiConfiguration({ selectedCollection, setApiConfig}) {
             if (typeof obj[k] === 'object' && obj[k] !== null && !Array.isArray(obj[k])) {
               Object.assign(acc, flattenObject(obj[k], `${pre}${k}`));
             } else {
-              acc[`${pre}${k}`] = { collectionField: '' };
+              acc[`${pre}${k}`] = { collectionField: autoMatch(k) };
             }
             return acc;
           }, {});
