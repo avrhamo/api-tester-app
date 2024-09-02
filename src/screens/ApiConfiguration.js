@@ -26,7 +26,7 @@ import {
 import { parseCurlCommand } from '../utils/curlParser';
 import { getCollectionFields } from '../services/databaseService';
 
-function ApiConfiguration({ selectedCollection, setApiConfig}) {
+function ApiConfiguration({ selectedCollection, setApiConfig }) {
   const [curlCommand, setCurlCommand] = useState('');
   const [filterText, setFilterText] = useState('');
   const [parsedCommand, setParsedCommand] = useState(null);
@@ -51,6 +51,7 @@ function ApiConfiguration({ selectedCollection, setApiConfig}) {
     setFilterText(e.target.value);
   };
 
+
   const filteredFields = collectionFields.filter((field) =>
     field.toLowerCase().includes(filterText.toLowerCase())
   );
@@ -62,6 +63,8 @@ function ApiConfiguration({ selectedCollection, setApiConfig}) {
         setError('');
         try {
           const fields = await getCollectionFields(selectedCollection.database, selectedCollection.collection);
+          console.log('Fetched Fields:', fields);
+
           setCollectionFields(fields);
         } catch (err) {
           console.error('Error fetching collection fields:', err);
@@ -74,13 +77,14 @@ function ApiConfiguration({ selectedCollection, setApiConfig}) {
     fetchFields();
   }, [selectedCollection]);
 
+
+
   const handleParseCurl = () => {
     try {
       const parsed = parseCurlCommand(curlCommand);
       console.log('Parsed curl command:', parsed);
       setParsedCommand(parsed);
-  
-      // Initialize field mappings
+
       const initialMappings = {
         urlParams: {},
         headers: {},
@@ -91,26 +95,25 @@ function ApiConfiguration({ selectedCollection, setApiConfig}) {
         headers: {},
         body: {},
       };
-  
-      // Helper function for auto-matching
+
       const autoMatch = (key) => {
         return collectionFields.find(field => field.toLowerCase() === key.toLowerCase()) || '';
       };
-  
+
       if (parsed.queryParams) {
         Object.keys(parsed.queryParams).forEach(key => {
           initialMappings.urlParams[key] = { collectionField: autoMatch(key) };
           initialUseFixedValue.urlParams[key] = false;
         });
       }
-  
+
       if (parsed.headers) {
         Object.keys(parsed.headers).forEach(key => {
           initialMappings.headers[key] = { collectionField: autoMatch(key) };
           initialUseFixedValue.headers[key] = false;
         });
       }
-  
+
       if (parsed.data && typeof parsed.data === 'object') {
         const flattenObject = (obj, prefix = '') => {
           return Object.keys(obj).reduce((acc, k) => {
@@ -123,14 +126,14 @@ function ApiConfiguration({ selectedCollection, setApiConfig}) {
             return acc;
           }, {});
         };
-  
+
         const flattenedBody = flattenObject(parsed.data);
         Object.assign(initialMappings.body, flattenedBody);
         Object.keys(flattenedBody).forEach(key => {
           initialUseFixedValue.body[key] = false;
         });
       }
-  
+
       console.log('Initial field mappings:', initialMappings);
       setFieldMappings(initialMappings);
       setUseFixedValue(initialUseFixedValue);
@@ -175,7 +178,7 @@ function ApiConfiguration({ selectedCollection, setApiConfig}) {
     handleFieldMappingChange(section, curlField, '', !useFixedValue[section][curlField]);
   };
 
-const renderMappingTable = (section) => {
+  const renderMappingTable = (section) => {
     const sectionData = fieldMappings[section] || {};
     return (
       <TableContainer>
@@ -234,12 +237,13 @@ const renderMappingTable = (section) => {
                               onClick={(e) => e.stopPropagation()}
                             />
                           </MenuItem>
-                          {filteredFields.map((field) => (
-                            <MenuItem key={field} value={field}>
+                          {filteredFields.map((field, index) => (
+                            <MenuItem key={`${field}-${index}`} value={field}>
                               {field}
                             </MenuItem>
                           ))}
                         </Select>
+
                       </FormControl>
                     )}
                   </TableCell>
@@ -251,7 +255,6 @@ const renderMappingTable = (section) => {
       </TableContainer>
     );
   };
-
 
   if (isLoading) {
     return (

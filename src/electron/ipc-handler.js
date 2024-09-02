@@ -54,12 +54,19 @@ function setupIpcHandlers() {
       const db = client.db(dbName);
       const collection = db.collection(collectionName);
       const sampleDocument = await collection.findOne();
-      return sampleDocument ? Object.keys(sampleDocument) : [];
+  
+      if (!sampleDocument) {
+        return [];
+      }
+  
+      const allFieldPaths = getNestedKeys(sampleDocument);
+      return allFieldPaths;
     } catch (error) {
       console.error('Error getting collection fields:', error);
       throw error;
     }
   });
+  
 
   ipcMain.handle('fetch-mongodb-data', async (event, database, collection, limit) => {
     if (!client || !client.topology || !client.topology.isConnected()) {
@@ -103,7 +110,7 @@ function setupIpcHandlers() {
           });
         });
       });
-
+``
       req.on('error', (error) => {
         reject(error);
       });
@@ -139,5 +146,41 @@ function setupIpcHandlers() {
     return await collection.find().limit(limit).toArray();
   });
 }
+
+const getNestedKeys = (obj, parentPath = '', maxDepth = 5, currentDepth = 0) => {
+  let keys = [];
+
+  // Check if max depth is reached
+  if (currentDepth >= maxDepth) {
+    return keys;  // Stop recursion if max depth is reached
+  }
+
+  for (const key in obj) {
+    if (obj.hasOwnProperty(key)) {
+      const currentPath = parentPath ? `${parentPath}.${key}` : key;
+
+      if (typeof obj[key] === 'object' && obj[key] !== null) {
+        if (Array.isArray(obj[key])) {
+          // Only process the first element of the array
+          const firstElement = obj[key][0];
+          if (firstElement && typeof firstElement === 'object') {
+            keys.push(`${currentPath}[0]`); // Show the array itself with the first element
+            keys = keys.concat(getNestedKeys(firstElement, `${currentPath}[0]`, maxDepth, currentDepth + 1));
+          } else {
+            keys.push(currentPath); // Add the path without expanding if it's a primitive
+          }
+        } else {
+          // Process nested objects
+          keys = keys.concat(getNestedKeys(obj[key], currentPath, maxDepth, currentDepth + 1));
+        }
+      } else {
+        // Add primitive data type path
+        keys.push(currentPath);
+      }
+    }
+  }
+
+  return keys;
+};
 
 module.exports = { setupIpcHandlers };

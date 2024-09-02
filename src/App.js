@@ -14,7 +14,7 @@ function App() {
   const [isConnected, setIsConnected] = useState(false);
   const [selectedCollection, setSelectedCollection] = useState(null);
   const [apiConfig, setApiConfig] = useState(null);
-  const [mode, setMode] = useState('light');
+  const [mode, setMode] = useState('dark');
 
   const colorMode = useMemo(
     () => ({
