@@ -12,30 +12,43 @@ const fetchDataFromMongoDB = async (database, collection) => {
 
 const mapDataToRequest = (mongoData, fieldMappings) => {
   const mappedData = {
-    queryParams: {},
-    headers: {},
-    body: {}
+    queryParams: {}, // Always initialize even if not used
+    headers: {},     // Always initialize even if not used
+    body: {}         // Always initialize even if not used
   };
 
-  console.log('Field Mappings:', fieldMappings);
-  console.log('Mongo Data:', mongoData);
-
-  Object.entries(fieldMappings).forEach(([section, mappings]) => {
-    if (!mappedData[section]) {
-      console.error(`Section ${section} is not defined in mappedData`);
-      return;
-    }
-    Object.entries(mappings).forEach(([apiField, dbField]) => {
-      if (dbField && mongoData[dbField] !== undefined) {
-        if (section === 'urlParams' || section === 'headers') {
-          mappedData[section][apiField] = mongoData[dbField];
-        } else {
-          // Assume it's a body field if not specified
-          mappedData.body[apiField] = mongoData[dbField];
-        }
+  // Process URL parameters
+  if (fieldMappings.urlParams) {
+    Object.entries(fieldMappings.urlParams).forEach(([apiField, dbField]) => {
+      if (dbField.collectionField && mongoData[dbField.collectionField] !== undefined) {
+        mappedData.queryParams[apiField] = mongoData[dbField.collectionField];
+      } else if (dbField.fixedValue !== undefined) {
+        mappedData.queryParams[apiField] = dbField.fixedValue;
       }
     });
-  });
+  }
+
+  // Process headers
+  if (fieldMappings.headers) {
+    Object.entries(fieldMappings.headers).forEach(([apiField, dbField]) => {
+      if (dbField.collectionField && mongoData[dbField.collectionField] !== undefined) {
+        mappedData.headers[apiField] = mongoData[dbField.collectionField];
+      } else if (dbField.fixedValue !== undefined) {
+        mappedData.headers[apiField] = dbField.fixedValue;
+      }
+    });
+  }
+
+  // Process body
+  if (fieldMappings.body) {
+    Object.entries(fieldMappings.body).forEach(([apiField, dbField]) => {
+      if (dbField.collectionField && mongoData[dbField.collectionField] !== undefined) {
+        mappedData.body[apiField] = mongoData[dbField.collectionField];
+      } else if (dbField.fixedValue !== undefined) {
+        mappedData.body[apiField] = dbField.fixedValue;
+      }
+    });
+  }
 
   console.log('Mapped Data:', mappedData);
   return mappedData;
@@ -99,7 +112,7 @@ export const executeApiTest = async (apiConfig, testParams) => {
     totalRequests: numRequests,
     successfulRequests: 0,
     failedRequests: 0,
-    responseTimes: [],
+    responseTimes: []
   };
 
   const enqueue = createRequestQueue(concurrency);
@@ -109,17 +122,14 @@ export const executeApiTest = async (apiConfig, testParams) => {
     try {
       const mongoData = await fetchDataFromMongoDB(selectedCollection.database, selectedCollection.collection);
       const { queryParams, headers, body } = mapDataToRequest(mongoData, fieldMappings);
-      
+
       const response = await makeRequest(
-        method, 
-        url, 
-        { ...configHeaders, ...headers }, 
-        queryParams, 
+        method,
+        url,
+        { ...configHeaders, ...headers },
+        queryParams,
         body
       );
-      
-      console.log('Request data:', { method, url, headers: { ...configHeaders, ...headers }, queryParams, body });
-      console.log('Response:', response);
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
         results.successfulRequests++;
@@ -134,8 +144,7 @@ export const executeApiTest = async (apiConfig, testParams) => {
     results.responseTimes.push(endTime - startTime);
   };
 
-  const requests = Array(numRequests).fill().map(() => enqueue(executeRequest));
-
+  const requests = Array.from({ length: numRequests }, () => enqueue(executeRequest));
   await Promise.all(requests);
 
   results.avgResponseTime = results.responseTimes.reduce((a, b) => a + b, 0) / numRequests;

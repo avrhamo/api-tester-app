@@ -17,6 +17,7 @@ import {
 import { executeApiTest } from '../services/apiService';
 
 function TestExecution({ apiConfig }) {
+  console.log("API Config received in TestExecution:", apiConfig);
   const [testParams, setTestParams] = useState({
     numRequests: 1,
     concurrency: 1,

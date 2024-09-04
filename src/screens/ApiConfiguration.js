@@ -286,7 +286,7 @@ function ApiConfiguration({ selectedCollection, setApiConfig }) {
         <TextField
           fullWidth
           multiline
-          rows={4}
+          rows={10}
           variant="outlined"
           label="Enter curl command"
           value={curlCommand}
