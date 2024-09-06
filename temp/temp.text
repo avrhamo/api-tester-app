@@ -4,4 +4,5 @@ mongodb://localhost:27017
 
 curl -X 'GET' \
   'http://localhost:8080/api/users/?phone=123' \
-  -H 'accept: */*'
+  -H 'accept: */*' \
+  --header 'encodedHeder: eyJwZXJzb25JZCI6ICIxMjM0NTYifQ=='

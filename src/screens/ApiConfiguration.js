@@ -21,36 +21,136 @@ import {
   Tab,
   CircularProgress,
   Switch,
-  FormControlLabel
+  FormControlLabel,
+  RadioGroup,
+  Radio,
+  IconButton,
+  Modal
 } from '@mui/material';
 import { parseCurlCommand } from '../utils/curlParser';
 import { getCollectionFields } from '../services/databaseService';
+import { decodeBase64 } from '../utils/base64Utils';
+import CloseIcon from '@mui/icons-material/Close';
+import { jwtDecode } from 'jwt-decode';
 
 function ApiConfiguration({ selectedCollection, setApiConfig }) {
   const [curlCommand, setCurlCommand] = useState('');
   const [filterText, setFilterText] = useState('');
   const [parsedCommand, setParsedCommand] = useState(null);
   const [fieldMappings, setFieldMappings] = useState({
-    urlParams: {},
-    headers: {},
-    body: {},
+    urlParams: {}, headers: {}, body: {}
   });
   const [useFixedValue, setUseFixedValue] = useState({
-    urlParams: {},
-    headers: {},
-    body: {},
+    urlParams: {}, headers: {}, body: {}
   });
   const [collectionFields, setCollectionFields] = useState([]);
+  const [encodedFieldModalOpen, setEncodedFieldModalOpen] = useState(false);
+  const [decodedFields, setDecodedFields] = useState({});
   const [activeTab, setActiveTab] = useState(0);
   const [debugInfo, setDebugInfo] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const history = useHistory();
+  const [specialFieldModalOpen, setSpecialFieldModalOpen] = useState(false);
+  const [specialFieldType, setSpecialFieldType] = useState('encoded');
+  const [oauthData, setOauthData] = useState({ accessTokenUrl: '', clientId: '', clientSecret: '' });
+  const [jwtToken, setJwtToken] = useState('');
 
   const handleFilterChange = (e) => {
     setFilterText(e.target.value);
   };
 
+  const handleDecodeBase64 = (base64String) => {
+    try {
+      // Basic validation for base64 string
+      if (!base64String || typeof base64String !== 'string' || base64String.trim() === '') {
+        alert('Please enter a valid Base64 encoded string.');
+        return;
+      }
+
+      // Decode the base64 string
+      const decodedString = atob(base64String); // `atob` decodes a base64-encoded string
+
+      // Try parsing the decoded string as JSON
+      const decodedObject = JSON.parse(decodedString);
+      console.log('Decoded Base64 JSON:', decodedObject);
+
+      // Extract fields from the decoded JSON object
+      const extractedFields = Object.entries(decodedObject).reduce((acc, [key, value]) => {
+        acc[key] = { collectionField: '', fixedValue: value }; // Initialize mapping fields
+        return acc;
+      }, {});
+
+      setDecodedFields(extractedFields);  // Set the decoded fields state for further mapping
+
+    } catch (error) {
+      console.error('Failed to decode Base64:', error);
+      alert('Invalid Base64 string or JSON format. Please check the input and try again.');
+    }
+  };
+
+  const handleOauthSubmit = async () => {
+    const { accessTokenUrl, clientId, clientSecret } = oauthData;
+
+    if (!accessTokenUrl || !clientId || !clientSecret) {
+      alert('Please fill in all OAuth fields.');
+      return;
+    }
+
+    try {
+      const response = await fetch(accessTokenUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+          grant_type: 'client_credentials',
+          client_id: clientId,
+          client_secret: clientSecret,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch access token.');
+      }
+
+      const data = await response.json();
+      console.log('OAuth Token Response:', data);
+
+      if (data.access_token) {
+        alert(`Access token retrieved: ${data.access_token}`);
+      } else {
+        alert('Failed to retrieve access token. Please check the credentials.');
+      }
+    } catch (error) {
+      console.error('Error fetching OAuth token:', error);
+      alert('Error fetching OAuth token. Please check the console for more details.');
+    }
+  };
+
+  const handleJwtDecode = () => {
+    try {
+      if (!jwtToken) {
+        alert('Please enter a JWT token.');
+        return;
+      }
+
+      // Decode the JWT token
+      const decoded = jwtDecode(jwtToken);
+      console.log('Decoded JWT:', decoded);
+
+      // Extract fields from the JWT payload for mapping
+      const decodedFields = Object.entries(decoded).reduce((acc, [key, value]) => {
+        acc[key] = { collectionField: '', fixedValue: value }; // Initialize mapping fields
+        return acc;
+      }, {});
+
+      setDecodedFields(decodedFields);  // Set the decoded fields state
+    } catch (error) {
+      console.error('Failed to decode JWT:', error);
+      alert('Invalid JWT token. Please check the input and try again.');
+    }
+  };
 
   const filteredFields = collectionFields.filter((field) =>
     field.toLowerCase().includes(filterText.toLowerCase())
@@ -77,7 +177,20 @@ function ApiConfiguration({ selectedCollection, setApiConfig }) {
     fetchFields();
   }, [selectedCollection]);
 
+  const handleSpecialFieldClick = () => {
+    setSpecialFieldModalOpen(true);
+  };
 
+  const handleRadioChange = (event) => {
+    setSpecialFieldType(event.target.value);
+  };
+
+  const handleCloseModal = () => {
+    setSpecialFieldModalOpen(false);
+    setSpecialFieldType('encoded'); // Reset to default when modal closes
+    setOauthData({ accessTokenUrl: '', clientId: '', clientSecret: '' });
+    setJwtToken('');
+  };
 
   const handleParseCurl = () => {
     try {
@@ -102,14 +215,14 @@ function ApiConfiguration({ selectedCollection, setApiConfig }) {
 
       if (parsed.queryParams) {
         Object.keys(parsed.queryParams).forEach(key => {
-          initialMappings.urlParams[key] = { collectionField: autoMatch(key) };
+          initialMappings.urlParams[key] = { collectionField: autoMatch(key), fixedValue: parsed.queryParams[key] };
           initialUseFixedValue.urlParams[key] = false;
         });
       }
 
       if (parsed.headers) {
         Object.keys(parsed.headers).forEach(key => {
-          initialMappings.headers[key] = { collectionField: autoMatch(key) };
+          initialMappings.headers[key] = { collectionField: autoMatch(key), fixedValue: parsed.headers[key] };
           initialUseFixedValue.headers[key] = false;
         });
       }
@@ -121,7 +234,7 @@ function ApiConfiguration({ selectedCollection, setApiConfig }) {
             if (typeof obj[k] === 'object' && obj[k] !== null && !Array.isArray(obj[k])) {
               Object.assign(acc, flattenObject(obj[k], `${pre}${k}`));
             } else {
-              acc[`${pre}${k}`] = { collectionField: autoMatch(k) };
+              acc[`${pre}${k}`] = { collectionField: autoMatch(k), fixedValue: obj[k] };
             }
             return acc;
           }, {});
@@ -143,6 +256,7 @@ function ApiConfiguration({ selectedCollection, setApiConfig }) {
       setError('Failed to parse curl command: ' + error.message);
     }
   };
+
 
   const handleFieldMappingChange = (section, curlField, value, isFixedValue = false) => {
     setFieldMappings(prev => ({
@@ -188,12 +302,13 @@ function ApiConfiguration({ selectedCollection, setApiConfig }) {
               <TableCell>Curl Field</TableCell>
               <TableCell>Use Fixed Value</TableCell>
               <TableCell>Collection Field / Fixed Value</TableCell>
+              <TableCell>Special Field</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {Object.keys(sectionData).length === 0 ? (
               <TableRow>
-                <TableCell colSpan={3}>No {section} found</TableCell>
+                <TableCell colSpan={4}>No {section} found</TableCell>
               </TableRow>
             ) : (
               Object.entries(sectionData).map(([curlField, mappedValue]) => (
@@ -243,9 +358,17 @@ function ApiConfiguration({ selectedCollection, setApiConfig }) {
                             </MenuItem>
                           ))}
                         </Select>
-
                       </FormControl>
                     )}
+                  </TableCell>
+                  <TableCell>
+                    <Button
+                      variant="contained"
+                      color="primary"
+                      onClick={handleSpecialFieldClick}
+                    >
+                      Special Field
+                    </Button>
                   </TableCell>
                 </TableRow>
               ))
@@ -350,6 +473,152 @@ function ApiConfiguration({ selectedCollection, setApiConfig }) {
           <pre>{debugInfo}</pre>
         </Paper>
       )}
+      <Modal open={specialFieldModalOpen} onClose={handleCloseModal}>
+        <Box
+          sx={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            width: '50%',  // Set modal width to 50% of the window
+            maxHeight: '80%',  // Optional: constrain height
+            overflowY: 'auto',  // Enable scrolling if content exceeds height
+            bgcolor: 'background.paper',
+            color: 'text.primary',
+            borderRadius: 1,
+            boxShadow: 24,
+            p: 4,
+          }}
+        >
+          <IconButton
+            aria-label="close"
+            onClick={handleCloseModal}
+            sx={{
+              position: 'absolute',
+              right: 8,
+              top: 8,
+            }}
+          >
+            <CloseIcon />
+          </IconButton>
+
+          <Typography variant="h6" component="h2" gutterBottom>
+            Select Special Field Type
+          </Typography>
+          <FormControl component="fieldset">
+            <RadioGroup value={specialFieldType} onChange={handleRadioChange}>
+              <FormControlLabel value="encoded" control={<Radio />} label="Encoded Field" />
+              <FormControlLabel value="oauth" control={<Radio />} label="OAuth Handling" />
+              <FormControlLabel value="jwt" control={<Radio />} label="JWT Handling" />
+            </RadioGroup>
+          </FormControl>
+
+          {specialFieldType === 'encoded' && (
+            <div>
+              <TextField
+                fullWidth
+                multiline
+                rows={3}  // Increase rows for larger input space
+                placeholder="Enter Base64 encoded data"
+                onChange={(e) => handleDecodeBase64(e.target.value)}
+                sx={{ marginBottom: 2 }}
+              />
+              {Object.entries(decodedFields).map(([key, value]) => (
+                <Grid container spacing={2} key={key} alignItems="center" justifyContent="space-between">
+                  <Grid item xs={6}>
+                    <Typography>{key}</Typography>
+                  </Grid>
+                  <Grid item xs={6}>
+                    <FormControl fullWidth variant="outlined" size="small">
+                      <InputLabel id={`${key}-label`}>Map to Field</InputLabel>
+                      <Select
+                        labelId={`${key}-label`}
+                        value={fieldMappings.headers[key] || ''}
+                        onChange={(e) =>
+                          setFieldMappings({
+                            ...fieldMappings,
+                            headers: {
+                              ...fieldMappings.headers,
+                              [key]: e.target.value,
+                            },
+                          })
+                        }
+                        label="Map to Field"
+                      >
+                        {collectionFields.map((field) => (
+                          <MenuItem key={field} value={field}>
+                            {field}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                  </Grid>
+                </Grid>
+              ))}
+            </div>
+          )}
+
+          {specialFieldType === 'oauth' && (
+            <div>
+              <TextField
+                fullWidth
+                placeholder="Access Token URL"
+                value={oauthData.accessTokenUrl}
+                onChange={(e) => setOauthData({ ...oauthData, accessTokenUrl: e.target.value })}
+                sx={{ marginBottom: 2 }}  // Add margin to create space between fields
+              />
+              <TextField
+                fullWidth
+                placeholder="Client ID"
+                value={oauthData.clientId}
+                onChange={(e) => setOauthData({ ...oauthData, clientId: e.target.value })}
+                sx={{ marginBottom: 2 }}  // Add margin to create space between fields
+              />
+              <TextField
+                fullWidth
+                placeholder="Client Secret"
+                value={oauthData.clientSecret}
+                onChange={(e) => setOauthData({ ...oauthData, clientSecret: e.target.value })}
+                sx={{ marginBottom: 2 }}  // Add margin to create space between fields
+              />
+              <Button
+                variant="contained"
+                color="primary"
+                onClick={handleOauthSubmit}
+                sx={{ bgcolor: '#51ed75', '&:hover': { bgcolor:  '#aeebbc' }, marginBottom: 2 }}>
+                Submit
+              </Button>
+            </div>
+          )}
+
+          {specialFieldType === 'jwt' && (
+            <div>
+              <TextField
+                fullWidth
+                multiline
+                rows={5}
+                placeholder="Enter JWT token"
+                value={jwtToken}
+                onChange={(e) => setJwtToken(e.target.value)}
+                sx={{ marginBottom: 2 }}  // Add margin to create space between fields
+              />
+              <Button
+                variant="contained"
+                sx={{ bgcolor: '#51ed75', '&:hover': { bgcolor:  '#aeebbc' }, marginBottom: 2 }}
+                onClick={handleJwtDecode}>
+                Decode JWT
+              </Button>
+            </div>
+          )}
+
+          {/* <Button variant="contained"
+            sx={{ display: 'flex', bgcolor: '#eb4266', '&:hover': { bgcolor: '#e88298' } }} // Custom color for Close button
+            onClick={handleCloseModal}
+          >
+            Close
+          </Button> */}
+        </Box>
+      </Modal>
     </Box>
   );
 }
