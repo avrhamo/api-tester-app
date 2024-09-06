@@ -600,7 +600,7 @@ function ApiConfiguration({ selectedCollection, setApiConfig }) {
                 placeholder="Enter JWT token"
                 value={jwtToken}
                 onChange={(e) => setJwtToken(e.target.value)}
-                sx={{ marginBottom: 2 }}  // Add margin to create space between fields
+                sx={{ marginBottom: 2 }}
               />
               <Button
                 variant="contained"
