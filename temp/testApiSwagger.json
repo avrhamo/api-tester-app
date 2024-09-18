@@ -1,29 +1,12 @@
 {
-    "openapi": "3.0.1",
-    "info": {
-        "title": "OpenAPI definition",
-        "version": "v0"
-    },
-    "servers": [
-        {
-            "url": "http://localhost:8080",
-            "description": "Generated server url"
-        }
-    ],
-    "paths": {
-        "/api/randomResponse": {
-            "get": {
-                "tags": [
-                    "testing-app-controller"
-                ],
-                "operationId": "randomResponse",
-                "responses": {
-                    "200": {
-                        "description": "OK"
-                    }
-                }
-            }
-        }
-    },
-    "components": {}
+    "first": "William",
+    "last": "Johnson",
+    "full": "William Johnson"
 }
+ewogICAgImZpcnN0IjogIldpbGxpYW0iLAogICAgImxhc3QiOiAiSm9obnNvbiIsCiAgICAiZnVsbCI6ICJXaWxsaWFtIEpvaG5zb24iCn0=
+
+curl -X 'GET' \
+  'http://localhost:8080/api/users/?phone=123' \
+  -H 'accept: */*' \
+  -H 'email: asdasd' \
+  --header 'someEncodedField: ewogICAgImZpcnN0IjogIldpbGxpYW0iLAogICAgImxhc3QiOiAiSm9obnNvbiIsCiAgICAiZnVsbCI6ICJXaWxsaWFtIEpvaG5zb24iCn0='

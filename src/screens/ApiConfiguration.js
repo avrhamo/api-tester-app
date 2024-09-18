@@ -13,9 +13,9 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-  Select,
   MenuItem,
   FormControl,
+  Select,
   InputLabel,
   Tabs,
   Tab,
@@ -32,16 +32,17 @@ import { getCollectionFields } from '../services/databaseService';
 import { decodeBase64 } from '../utils/base64Utils';
 import CloseIcon from '@mui/icons-material/Close';
 import { jwtDecode } from 'jwt-decode';
+import SpecialFieldModal from '../components/SpecialFieldModal';
 
 function ApiConfiguration({ selectedCollection, setApiConfig }) {
   const [curlCommand, setCurlCommand] = useState('');
   const [filterText, setFilterText] = useState('');
   const [parsedCommand, setParsedCommand] = useState(null);
   const [fieldMappings, setFieldMappings] = useState({
-    urlParams: {}, headers: {}, body: {}
+    urlParams: {}, headers: {}, body: {}, specialFields: {}
   });
   const [useFixedValue, setUseFixedValue] = useState({
-    urlParams: {}, headers: {}, body: {}
+    urlParams: {}, headers: {}, body: {}, specialFields: {}
   });
   const [collectionFields, setCollectionFields] = useState([]);
   const [encodedFieldModalOpen, setEncodedFieldModalOpen] = useState(false);
@@ -55,11 +56,110 @@ function ApiConfiguration({ selectedCollection, setApiConfig }) {
   const [specialFieldType, setSpecialFieldType] = useState('encoded');
   const [oauthData, setOauthData] = useState({ accessTokenUrl: '', clientId: '', clientSecret: '' });
   const [jwtToken, setJwtToken] = useState('');
+  const [specialFieldSection, setSpecialFieldSection] = useState('headers'); // Default to 'headers'
+  const [specialFieldName, setSpecialFieldName] = useState(''); // Field name input
+  const [encodedString, setEncodedString] = useState('');
+  const [decodedPayload, setDecodedPayload] = useState({});
+
 
   const handleFilterChange = (e) => {
     setFilterText(e.target.value);
   };
 
+  const addSpecialField = (section, fieldName, payload) => {
+    setFieldMappings((prev) => {
+      const updatedSpecialFields = [
+        ...(prev.specialFields || []),
+        { section, fieldName, payload },
+      ];
+      console.log('Updated specialFields:', updatedSpecialFields); // Debugging line
+      return {
+        ...prev,
+        specialFields: updatedSpecialFields,
+      };
+    });
+  };
+
+  const handleCloseModal = () => {
+    if (!specialFieldName) {
+      alert('Please provide a valid encoded field name.');
+      setSpecialFieldModalOpen(false);
+      return;
+    }
+
+    console.log('SpecialFieldName before adding encoded field:', specialFieldName);
+    setSpecialFieldModalOpen(false);
+  };
+  const handleAddEncodedField = (encodedString, section) => {
+    
+    if(!encodedString) {return;}
+
+    try {
+      const decodedPayload = JSON.parse(atob(encodedString));
+  
+      if (!specialFieldName) {
+        alert('Please provide a valid field name for the encoded field.');
+        return;
+      }
+  
+      const initialPayload = {};
+      Object.keys(decodedPayload).forEach((key) => {
+        initialPayload[key] = '';
+      });
+  
+      setFieldMappings((prev) => {
+        const updatedSpecialFields = [...(prev.specialFields || [])];
+  
+        const specialFieldIndex = updatedSpecialFields.findIndex(field => field.fieldName === specialFieldName);
+  
+        if (specialFieldIndex !== -1) {
+          updatedSpecialFields[specialFieldIndex] = {
+            ...updatedSpecialFields[specialFieldIndex],
+            payload: { ...updatedSpecialFields[specialFieldIndex].payload, ...initialPayload },
+          };
+        } else {
+          updatedSpecialFields.push({
+            section: section,
+            fieldName: specialFieldName,
+            payload: initialPayload,
+          });
+        }
+  
+        return {
+          ...prev,
+          specialFields: updatedSpecialFields,
+        };
+      });
+  
+      setEncodedString('');
+    } catch (error) {
+      console.error('Failed to decode or parse Base64 string:', error);
+      alert('Invalid Base64 string or JSON format.');
+    }
+  };
+
+  const handleOpenModal = () => {
+    setSpecialFieldName(''); // Clear the field name
+    setEncodedString(''); // Clear the encoded string
+    setSpecialFieldModalOpen(true);
+  };
+
+  const isBase64 = (str) => {
+    try {
+      // Basic check: Length should be a multiple of 4
+      if (str.length % 4 !== 0) {
+        return false;
+      }
+
+      // Try decoding the base64 string
+      atob(str);
+
+      // Check if it matches base64 format
+      return /^[A-Za-z0-9+/]+={0,2}$/.test(str);
+    } catch (error) {
+      return false;
+    }
+  };
   const handleDecodeBase64 = (base64String) => {
     try {
       // Basic validation for base64 string
@@ -177,19 +277,14 @@ function ApiConfiguration({ selectedCollection, setApiConfig }) {
     fetchFields();
   }, [selectedCollection]);
 
-  const handleSpecialFieldClick = () => {
+  const handleSpecialFieldClick = (fieldName, encodedString) => {
+    setSpecialFieldName(fieldName);
+    handleAddEncodedField(encodedString, 'headers');
     setSpecialFieldModalOpen(true);
   };
 
   const handleRadioChange = (event) => {
     setSpecialFieldType(event.target.value);
-  };
-
-  const handleCloseModal = () => {
-    setSpecialFieldModalOpen(false);
-    setSpecialFieldType('encoded'); // Reset to default when modal closes
-    setOauthData({ accessTokenUrl: '', clientId: '', clientSecret: '' });
-    setJwtToken('');
   };
 
   const handleParseCurl = () => {
@@ -202,11 +297,13 @@ function ApiConfiguration({ selectedCollection, setApiConfig }) {
         urlParams: {},
         headers: {},
         body: {},
+        specialFields: []
       };
       const initialUseFixedValue = {
         urlParams: {},
         headers: {},
         body: {},
+        specialFields: []
       };
 
       const autoMatch = (key) => {
@@ -222,6 +319,15 @@ function ApiConfiguration({ selectedCollection, setApiConfig }) {
 
       if (parsed.headers) {
         Object.keys(parsed.headers).forEach(key => {
+          // if (isBase64(parsed.headers[key])) {
+          //   try {
+          //     const decodedPayload = JSON.parse(atob(parsed.headers[key]));
+          //     addSpecialField('headers', key, decodedPayload);
+          //   } catch (error) {
+          //     console.error('Failed to decode or parse base64 string in header:', error);
+          //   }
+          // }
+
           initialMappings.headers[key] = { collectionField: autoMatch(key), fixedValue: parsed.headers[key] };
           initialUseFixedValue.headers[key] = false;
         });
@@ -257,15 +363,43 @@ function ApiConfiguration({ selectedCollection, setApiConfig }) {
     }
   };
 
-
-  const handleFieldMappingChange = (section, curlField, value, isFixedValue = false) => {
-    setFieldMappings(prev => ({
-      ...prev,
-      [section]: {
-        ...prev[section],
-        [curlField]: isFixedValue ? { fixedValue: value } : { collectionField: value }
+  const handleFieldMappingChange = (key, selectedField) => {
+    console.log('Updating payload key:', key, 'with selected field:', selectedField);
+    console.log('Current specialFieldName:', specialFieldName);
+  
+    setFieldMappings((prev) => {
+      // Always work with a defined array for specialFields
+      const updatedSpecialFields = prev.specialFields ? [...prev.specialFields] : [];
+  
+      // Find the index of the special field to update
+      const specialFieldIndex = updatedSpecialFields.findIndex(field => field.fieldName === specialFieldName);
+  
+      if (specialFieldIndex !== -1) {
+        // Update existing special field
+        const updatedPayload = { ...updatedSpecialFields[specialFieldIndex].payload };
+        updatedPayload[key] = selectedField;
+  
+        updatedSpecialFields[specialFieldIndex] = {
+          ...updatedSpecialFields[specialFieldIndex],
+          payload: updatedPayload,
+        };
+      } else {
+        // Add new special field if it doesn't exist
+        console.log('Special field not found. Adding a new special field:', specialFieldName);
+        const newPayload = { [key]: selectedField }; // Create a new payload with the current key and selected field
+  
+        updatedSpecialFields.push({
+          section: 'headers', // Assuming 'headers' as the default section; modify as needed
+          fieldName: specialFieldName,
+          payload: newPayload,
+        });
       }
-    }));
+  
+      return {
+        ...prev,
+        specialFields: updatedSpecialFields,
+      };
+    });
   };
 
   const handleSubmit = () => {
@@ -274,12 +408,11 @@ function ApiConfiguration({ selectedCollection, setApiConfig }) {
     const config = {
       ...parsedCommand,
       fieldMappings,
-      selectedCollection
+      selectedCollection,
     };
     setApiConfig(config);
     history.push('/execute-test');
   };
-
   const handleUseFixedValueChange = (section, curlField) => {
     setUseFixedValue(prev => ({
       ...prev,
@@ -365,7 +498,7 @@ function ApiConfiguration({ selectedCollection, setApiConfig }) {
                     <Button
                       variant="contained"
                       color="primary"
-                      onClick={handleSpecialFieldClick}
+                      onClick={() => handleSpecialFieldClick(curlField, encodedString)}
                     >
                       Special Field
                     </Button>
@@ -473,152 +606,26 @@ function ApiConfiguration({ selectedCollection, setApiConfig }) {
           <pre>{debugInfo}</pre>
         </Paper>
       )}
-      <Modal open={specialFieldModalOpen} onClose={handleCloseModal}>
-        <Box
-          sx={{
-            position: 'absolute',
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)',
-            width: '50%',  // Set modal width to 50% of the window
-            maxHeight: '80%',  // Optional: constrain height
-            overflowY: 'auto',  // Enable scrolling if content exceeds height
-            bgcolor: 'background.paper',
-            color: 'text.primary',
-            borderRadius: 1,
-            boxShadow: 24,
-            p: 4,
-          }}
-        >
-          <IconButton
-            aria-label="close"
-            onClick={handleCloseModal}
-            sx={{
-              position: 'absolute',
-              right: 8,
-              top: 8,
-            }}
-          >
-            <CloseIcon />
-          </IconButton>
-
-          <Typography variant="h6" component="h2" gutterBottom>
-            Select Special Field Type
-          </Typography>
-          <FormControl component="fieldset">
-            <RadioGroup value={specialFieldType} onChange={handleRadioChange}>
-              <FormControlLabel value="encoded" control={<Radio />} label="Encoded Field" />
-              <FormControlLabel value="oauth" control={<Radio />} label="OAuth Handling" />
-              <FormControlLabel value="jwt" control={<Radio />} label="JWT Handling" />
-            </RadioGroup>
-          </FormControl>
-
-          {specialFieldType === 'encoded' && (
-            <div>
-              <TextField
-                fullWidth
-                multiline
-                rows={3}  // Increase rows for larger input space
-                placeholder="Enter Base64 encoded data"
-                onChange={(e) => handleDecodeBase64(e.target.value)}
-                sx={{ marginBottom: 2 }}
-              />
-              {Object.entries(decodedFields).map(([key, value]) => (
-                <Grid container spacing={2} key={key} alignItems="center" justifyContent="space-between">
-                  <Grid item xs={6}>
-                    <Typography>{key}</Typography>
-                  </Grid>
-                  <Grid item xs={6}>
-                    <FormControl fullWidth variant="outlined" size="small">
-                      <InputLabel id={`${key}-label`}>Map to Field</InputLabel>
-                      <Select
-                        labelId={`${key}-label`}
-                        value={fieldMappings.headers[key] || ''}
-                        onChange={(e) =>
-                          setFieldMappings({
-                            ...fieldMappings,
-                            headers: {
-                              ...fieldMappings.headers,
-                              [key]: e.target.value,
-                            },
-                          })
-                        }
-                        label="Map to Field"
-                      >
-                        {collectionFields.map((field) => (
-                          <MenuItem key={field} value={field}>
-                            {field}
-                          </MenuItem>
-                        ))}
-                      </Select>
-                    </FormControl>
-                  </Grid>
-                </Grid>
-              ))}
-            </div>
-          )}
-
-          {specialFieldType === 'oauth' && (
-            <div>
-              <TextField
-                fullWidth
-                placeholder="Access Token URL"
-                value={oauthData.accessTokenUrl}
-                onChange={(e) => setOauthData({ ...oauthData, accessTokenUrl: e.target.value })}
-                sx={{ marginBottom: 2 }}  // Add margin to create space between fields
-              />
-              <TextField
-                fullWidth
-                placeholder="Client ID"
-                value={oauthData.clientId}
-                onChange={(e) => setOauthData({ ...oauthData, clientId: e.target.value })}
-                sx={{ marginBottom: 2 }}  // Add margin to create space between fields
-              />
-              <TextField
-                fullWidth
-                placeholder="Client Secret"
-                value={oauthData.clientSecret}
-                onChange={(e) => setOauthData({ ...oauthData, clientSecret: e.target.value })}
-                sx={{ marginBottom: 2 }}  // Add margin to create space between fields
-              />
-              <Button
-                variant="contained"
-                color="primary"
-                onClick={handleOauthSubmit}
-                sx={{ bgcolor: '#51ed75', '&:hover': { bgcolor:  '#aeebbc' }, marginBottom: 2 }}>
-                Submit
-              </Button>
-            </div>
-          )}
-
-          {specialFieldType === 'jwt' && (
-            <div>
-              <TextField
-                fullWidth
-                multiline
-                rows={5}
-                placeholder="Enter JWT token"
-                value={jwtToken}
-                onChange={(e) => setJwtToken(e.target.value)}
-                sx={{ marginBottom: 2 }}
-              />
-              <Button
-                variant="contained"
-                sx={{ bgcolor: '#51ed75', '&:hover': { bgcolor:  '#aeebbc' }, marginBottom: 2 }}
-                onClick={handleJwtDecode}>
-                Decode JWT
-              </Button>
-            </div>
-          )}
-
-          {/* <Button variant="contained"
-            sx={{ display: 'flex', bgcolor: '#eb4266', '&:hover': { bgcolor: '#e88298' } }} // Custom color for Close button
-            onClick={handleCloseModal}
-          >
-            Close
-          </Button> */}
-        </Box>
-      </Modal>
+      <SpecialFieldModal
+        open={specialFieldModalOpen}
+        onClose={handleCloseModal}
+        specialFieldType={specialFieldType}
+        handleRadioChange={handleRadioChange}
+        encodedString={encodedString}
+        setEncodedString={setEncodedString}
+        handleDecodeBase64={handleDecodeBase64}
+        fieldMappings={fieldMappings}
+        specialFieldName={specialFieldName}
+        setSpecialFieldName={setSpecialFieldName}
+        handleFieldMappingChange={handleFieldMappingChange}
+        collectionFields={collectionFields}
+        oauthData={oauthData}
+        setOauthData={setOauthData}
+        handleOauthSubmit={handleOauthSubmit}
+        jwtToken={jwtToken}
+        setJwtToken={setJwtToken}
+        handleJwtDecode={handleJwtDecode}
+      />
     </Box>
   );
 }

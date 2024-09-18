@@ -35,8 +35,9 @@ function TestExecution({ apiConfig }) {
     setIsLoading(true);
     setError('');
     setResults(null);
-
+  
     try {
+      console.log('API Config before executing test:', apiConfig);
       const testResults = await executeApiTest(apiConfig, testParams);
       setResults(testResults);
     } catch (err) {

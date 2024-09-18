@@ -10,18 +10,25 @@ const fetchDataFromMongoDB = async (database, collection) => {
   }
 };
 
+const getNestedValue = (obj, path) => {
+  return path.split('.').reduce((acc, key) => (acc && acc[key] !== undefined) ? acc[key] : undefined, obj);
+};
+
 const mapDataToRequest = (mongoData, fieldMappings) => {
   const mappedData = {
-    queryParams: {}, // Always initialize even if not used
-    headers: {},     // Always initialize even if not used
-    body: {}         // Always initialize even if not used
+    queryParams: {},
+    headers: {},
+    body: {},
   };
 
   // Process URL parameters
   if (fieldMappings.urlParams) {
     Object.entries(fieldMappings.urlParams).forEach(([apiField, dbField]) => {
-      if (dbField.collectionField && mongoData[dbField.collectionField] !== undefined) {
-        mappedData.queryParams[apiField] = mongoData[dbField.collectionField];
+      if (dbField.collectionField) {
+        const value = getNestedValue(mongoData, dbField.collectionField);
+        if (value !== undefined) {
+          mappedData.queryParams[apiField] = value;
+        }
       } else if (dbField.fixedValue !== undefined) {
         mappedData.queryParams[apiField] = dbField.fixedValue;
       }
@@ -31,8 +38,11 @@ const mapDataToRequest = (mongoData, fieldMappings) => {
   // Process headers
   if (fieldMappings.headers) {
     Object.entries(fieldMappings.headers).forEach(([apiField, dbField]) => {
-      if (dbField.collectionField && mongoData[dbField.collectionField] !== undefined) {
-        mappedData.headers[apiField] = mongoData[dbField.collectionField];
+      if (dbField.collectionField) {
+        const value = getNestedValue(mongoData, dbField.collectionField);
+        if (value !== undefined) {
+          mappedData.headers[apiField] = value;
+        }
       } else if (dbField.fixedValue !== undefined) {
         mappedData.headers[apiField] = dbField.fixedValue;
       }
@@ -42,21 +52,56 @@ const mapDataToRequest = (mongoData, fieldMappings) => {
   // Process body
   if (fieldMappings.body) {
     Object.entries(fieldMappings.body).forEach(([apiField, dbField]) => {
-      if (dbField.collectionField && mongoData[dbField.collectionField] !== undefined) {
-        mappedData.body[apiField] = mongoData[dbField.collectionField];
+      if (dbField.collectionField) {
+        const value = getNestedValue(mongoData, dbField.collectionField);
+        if (value !== undefined) {
+          mappedData.body[apiField] = value;
+        }
       } else if (dbField.fixedValue !== undefined) {
         mappedData.body[apiField] = dbField.fixedValue;
       }
     });
   }
 
-  console.log('Mapped Data:', mappedData);
+  // Process special fields
+  if (fieldMappings.specialFields && fieldMappings.specialFields.length > 0) {
+    fieldMappings.specialFields.forEach((specialField) => {
+      const { section, fieldName, payload } = specialField;
+
+      // Clone the payload to modify it
+      const modifiedPayload = { ...payload };
+
+      // Replace payload fields with values from MongoDB
+      Object.keys(modifiedPayload).forEach((key) => {
+        const dbField = modifiedPayload[key]; // The value here should be the MongoDB field name, possibly nested
+        const value = getNestedValue(mongoData, dbField);
+        if (value !== undefined) {
+          modifiedPayload[key] = value; // Replace with the actual value from MongoDB
+        } else {
+          console.log(`MongoDB field '${dbField}' not found in the document`);
+        }
+      });
+
+      // Encode the modified payload back to base64
+      const encodedPayload = btoa(JSON.stringify(modifiedPayload));
+
+      // Add the encoded payload to the appropriate section
+      if (section === 'headers') {
+        mappedData.headers[fieldName] = encodedPayload;
+      } else if (section === 'urlParams') {
+        mappedData.queryParams[fieldName] = encodedPayload;
+      } else if (section === 'body') {
+        mappedData.body[fieldName] = encodedPayload;
+      }
+    });
+  }
+
   return mappedData;
 };
 
 const makeRequest = async (method, url, headers, queryParams, body) => {
   let fullUrl = new URL(url);
-  
+
   // Add query parameters
   Object.entries(queryParams).forEach(([key, value]) => {
     fullUrl.searchParams.append(key, value);
@@ -120,8 +165,10 @@ export const executeApiTest = async (apiConfig, testParams) => {
   const executeRequest = async () => {
     const startTime = Date.now();
     try {
+      console.log('Making API request... with fieldMappings:', { fieldMappings });
       const mongoData = await fetchDataFromMongoDB(selectedCollection.database, selectedCollection.collection);
       const { queryParams, headers, body } = mapDataToRequest(mongoData, fieldMappings);
+      console.log('Final Request Data:', { queryParams, headers, body });
 
       const response = await makeRequest(
         method,
