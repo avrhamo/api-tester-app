@@ -154,26 +154,70 @@ const SpecialFieldModal = ({
                     </div>
                 )}
 
-                {specialFieldType === 'jwt' && (
-                    <div>
-                        <TextField
-                            fullWidth
-                            multiline
-                            rows={5}
-                            placeholder="Enter JWT token"
-                            value={jwtToken}
-                            onChange={(e) => setJwtToken(e.target.value)}
-                            sx={{ marginBottom: 2 }}
-                        />
-                        <Button
-                            variant="contained"
-                            sx={{ bgcolor: '#51ed75', '&:hover': { bgcolor: '#aeebbc' }, marginBottom: 2 }}
-                            onClick={handleJwtDecode}
-                        >
-                            Decode JWT
-                        </Button>
-                    </div>
-                )}
+{specialFieldType === 'jwt' && (
+  <div>
+    <TextField
+      fullWidth
+      multiline
+      rows={3}
+      placeholder="Enter CURL command to obtain JWT"
+      value={jwtCurlCommand}
+      onChange={(e) => setJwtCurlCommand(e.target.value)}
+      sx={{ marginBottom: 2 }}
+    />
+    <Button
+      variant="contained"
+      sx={{ bgcolor: '#51ed75', '&:hover': { bgcolor: '#aeebbc' }, marginBottom: 2 }}
+      onClick={handleJwtCurlCommandExecution}
+    >
+      Execute JWT CURL
+    </Button>
+
+    <TextField
+      fullWidth
+      multiline
+      rows={5}
+      placeholder="Enter JWT token"
+      value={jwtToken}
+      onChange={(e) => setJwtToken(e.target.value)}
+      sx={{ marginBottom: 2 }}
+    />
+    <Button
+      variant="contained"
+      sx={{ bgcolor: '#51ed75', '&:hover': { bgcolor: '#aeebbc' }, marginBottom: 2 }}
+      onClick={handleJwtDecode}
+    >
+      Decode JWT
+    </Button>
+
+    {Object.entries(decodedFields).map(([key, value]) => (
+      <Grid container spacing={2} key={key} alignItems="center" justifyContent="space-between">
+        <Grid item xs={6}>
+          <Typography>{key}</Typography>
+        </Grid>
+        <Grid item xs={6}>
+          <FormControl fullWidth sx={{ mb: 2 }}>
+            <InputLabel>Map to Field</InputLabel>
+            <Select
+              labelId={`${key}-label`}
+              value={
+                fieldMappings.specialFields?.find((field) => field.fieldName === specialFieldName)?.payload[key] || ''
+              }
+              onChange={(e) => handleFieldMappingChange(key, e.target.value)}
+              label="Map to Field"
+            >
+              {collectionFields.map((field) => (
+                <MenuItem key={field} value={field}>
+                  {field}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </Grid>
+      </Grid>
+    ))}
+  </div>
+)}
             </Box>
         </Modal>
     );

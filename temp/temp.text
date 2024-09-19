@@ -18,3 +18,15 @@ curl -X 'GET' \
   -H 'accept: */*' \
   -H 'email: asdasd' \
   --header 'someEncodedField: eyJwcmltZUVtYWlsIjogImV4YW1wbGVAZXhhbXBsLmNvbSJ9'
+
+{"sub":null,"iss":"your-app-name","iat":1726641045,"exp":1726644645}
+
+"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.
+{"sub":"jwt dummy","iss":"your-app-name","iat":1726676445,"exp":1726680045,"email":"James@example.com","phone":"+678 678-34-73287","birthdate":null}.
+l6Ihigbs8uzYH9dVWOOvPBtVUOp6_bvXGeA-6D5dKjE"
+
+curl -X 'GET' \
+  'http://localhost:8080/api/users/?phone=123' \
+  -H 'accept: */*' \
+  --header 'someEncodedField: eyJwcmltZUVtYWlsIjogImV4YW1wbGVAZXhhbXBsLmNvbSJ9'
+  --H 'jwt: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJqd3QgZHVtbXkiLCJpc3MiOiJ5b3VyLWFwcC1uYW1lIiwiaWF0IjoxNzI2Njc2NDQ1LCJleHAiOjE3MjY2ODAwNDUsImVtYWlsIjoiSmFtZXNAZXhhbXBsZS5jb20iLCJwaG9uZSI6Iis2NzggNjc4LTM0LTczMjg3IiwiYmlydGhkYXRlIjpudWxsfQ.l6Ihigbs8uzYH9dVWOOvPBtVUOp6_bvXGeA-6D5dKjE'

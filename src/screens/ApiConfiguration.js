@@ -21,16 +21,10 @@ import {
   Tab,
   CircularProgress,
   Switch,
-  FormControlLabel,
-  RadioGroup,
-  Radio,
-  IconButton,
-  Modal
+  FormControlLabel
 } from '@mui/material';
 import { parseCurlCommand } from '../utils/curlParser';
 import { getCollectionFields } from '../services/databaseService';
-import { decodeBase64 } from '../utils/base64Utils';
-import CloseIcon from '@mui/icons-material/Close';
 import { jwtDecode } from 'jwt-decode';
 import SpecialFieldModal from '../components/SpecialFieldModal';
 
@@ -45,7 +39,6 @@ function ApiConfiguration({ selectedCollection, setApiConfig }) {
     urlParams: {}, headers: {}, body: {}, specialFields: {}
   });
   const [collectionFields, setCollectionFields] = useState([]);
-  const [encodedFieldModalOpen, setEncodedFieldModalOpen] = useState(false);
   const [decodedFields, setDecodedFields] = useState({});
   const [activeTab, setActiveTab] = useState(0);
   const [debugInfo, setDebugInfo] = useState('');
@@ -56,29 +49,15 @@ function ApiConfiguration({ selectedCollection, setApiConfig }) {
   const [specialFieldType, setSpecialFieldType] = useState('encoded');
   const [oauthData, setOauthData] = useState({ accessTokenUrl: '', clientId: '', clientSecret: '' });
   const [jwtToken, setJwtToken] = useState('');
-  const [specialFieldSection, setSpecialFieldSection] = useState('headers'); // Default to 'headers'
-  const [specialFieldName, setSpecialFieldName] = useState(''); // Field name input
+  const [specialFieldName, setSpecialFieldName] = useState('');
   const [encodedString, setEncodedString] = useState('');
-  const [decodedPayload, setDecodedPayload] = useState({});
+  const [jwtCurlCommand, setJwtCurlCommand] = useState('');
 
 
   const handleFilterChange = (e) => {
     setFilterText(e.target.value);
   };
 
-  const addSpecialField = (section, fieldName, payload) => {
-    setFieldMappings((prev) => {
-      const updatedSpecialFields = [
-        ...(prev.specialFields || []),
-        { section, fieldName, payload },
-      ];
-      console.log('Updated specialFields:', updatedSpecialFields); // Debugging line
-      return {
-        ...prev,
-        specialFields: updatedSpecialFields,
-      };
-    });
-  };
 
   const handleCloseModal = () => {
     if (!specialFieldName) {
@@ -91,27 +70,27 @@ function ApiConfiguration({ selectedCollection, setApiConfig }) {
     setSpecialFieldModalOpen(false);
   };
   const handleAddEncodedField = (encodedString, section) => {
-    
-    if(!encodedString) {return;}
+
+    if (!encodedString) { return; }
 
     try {
       const decodedPayload = JSON.parse(atob(encodedString));
-  
+
       if (!specialFieldName) {
         alert('Please provide a valid field name for the encoded field.');
         return;
       }
-  
+
       const initialPayload = {};
       Object.keys(decodedPayload).forEach((key) => {
         initialPayload[key] = '';
       });
-  
+
       setFieldMappings((prev) => {
         const updatedSpecialFields = [...(prev.specialFields || [])];
-  
+
         const specialFieldIndex = updatedSpecialFields.findIndex(field => field.fieldName === specialFieldName);
-  
+
         if (specialFieldIndex !== -1) {
           updatedSpecialFields[specialFieldIndex] = {
             ...updatedSpecialFields[specialFieldIndex],
@@ -124,13 +103,13 @@ function ApiConfiguration({ selectedCollection, setApiConfig }) {
             payload: initialPayload,
           });
         }
-  
+
         return {
           ...prev,
           specialFields: updatedSpecialFields,
         };
       });
-  
+
       setEncodedString('');
     } catch (error) {
       console.error('Failed to decode or parse Base64 string:', error);
@@ -138,50 +117,35 @@ function ApiConfiguration({ selectedCollection, setApiConfig }) {
     }
   };
 
-  const handleOpenModal = () => {
-    setSpecialFieldName(''); // Clear the field name
-    setEncodedString(''); // Clear the encoded string
-    setSpecialFieldModalOpen(true);
-  };
-
-  const isBase64 = (str) => {
+  const handleJwtCurlCommandExecution = async () => {
     try {
-      // Basic check: Length should be a multiple of 4
-      if (str.length % 4 !== 0) {
-        return false;
-      }
-
-      // Try decoding the base64 string
-      atob(str);
-
-      // Check if it matches base64 format
-      return /^[A-Za-z0-9+/]+={0,2}$/.test(str);
+      const response = await executeCurlCommand(jwtCurlCommand);
+      const token = extractTokenFromResponse(response); // Implement this function to extract the JWT from the response
+      setJwtToken(token);
     } catch (error) {
-      return false;
+      console.error('Failed to execute JWT CURL command:', error);
+      alert('Failed to obtain JWT token. Please check the CURL command.');
     }
   };
+
   const handleDecodeBase64 = (base64String) => {
     try {
-      // Basic validation for base64 string
       if (!base64String || typeof base64String !== 'string' || base64String.trim() === '') {
         alert('Please enter a valid Base64 encoded string.');
         return;
       }
 
-      // Decode the base64 string
       const decodedString = atob(base64String); // `atob` decodes a base64-encoded string
 
-      // Try parsing the decoded string as JSON
       const decodedObject = JSON.parse(decodedString);
       console.log('Decoded Base64 JSON:', decodedObject);
 
-      // Extract fields from the decoded JSON object
       const extractedFields = Object.entries(decodedObject).reduce((acc, [key, value]) => {
-        acc[key] = { collectionField: '', fixedValue: value }; // Initialize mapping fields
+        acc[key] = { collectionField: '', fixedValue: value };
         return acc;
       }, {});
 
-      setDecodedFields(extractedFields);  // Set the decoded fields state for further mapping
+      setDecodedFields(extractedFields);
 
     } catch (error) {
       console.error('Failed to decode Base64:', error);
@@ -235,17 +199,43 @@ function ApiConfiguration({ selectedCollection, setApiConfig }) {
         return;
       }
 
-      // Decode the JWT token
       const decoded = jwtDecode(jwtToken);
       console.log('Decoded JWT:', decoded);
 
-      // Extract fields from the JWT payload for mapping
-      const decodedFields = Object.entries(decoded).reduce((acc, [key, value]) => {
-        acc[key] = { collectionField: '', fixedValue: value }; // Initialize mapping fields
+      const initialPayload = Object.entries(decoded).reduce((acc, [key, value]) => {
+        acc[key] = ''; // Placeholder for the MongoDB field mapping
         return acc;
       }, {});
 
-      setDecodedFields(decodedFields);  // Set the decoded fields state
+      setDecodedFields(initialPayload); // Set up fields for mapping
+
+      setFieldMappings((prev) => {
+        const updatedSpecialFields = [...(prev.specialFields || [])];
+
+        // Find the index of the special field to update or create a new one
+        const specialFieldIndex = updatedSpecialFields.findIndex(field => field.fieldName === specialFieldName);
+
+        if (specialFieldIndex !== -1) {
+          // Update existing special field
+          updatedSpecialFields[specialFieldIndex] = {
+            ...updatedSpecialFields[specialFieldIndex],
+            payload: { ...updatedSpecialFields[specialFieldIndex].payload, ...initialPayload },
+          };
+        } else {
+          // Add new special field
+          updatedSpecialFields.push({
+            section: 'headers', // Assuming JWT is used in headers; adjust as needed
+            fieldName: specialFieldName,
+            payload: initialPayload,
+          });
+        }
+
+        return {
+          ...prev,
+          specialFields: updatedSpecialFields,
+        };
+      });
+
     } catch (error) {
       console.error('Failed to decode JWT:', error);
       alert('Invalid JWT token. Please check the input and try again.');
@@ -319,15 +309,6 @@ function ApiConfiguration({ selectedCollection, setApiConfig }) {
 
       if (parsed.headers) {
         Object.keys(parsed.headers).forEach(key => {
-          // if (isBase64(parsed.headers[key])) {
-          //   try {
-          //     const decodedPayload = JSON.parse(atob(parsed.headers[key]));
-          //     addSpecialField('headers', key, decodedPayload);
-          //   } catch (error) {
-          //     console.error('Failed to decode or parse base64 string in header:', error);
-          //   }
-          // }
-
           initialMappings.headers[key] = { collectionField: autoMatch(key), fixedValue: parsed.headers[key] };
           initialUseFixedValue.headers[key] = false;
         });
@@ -364,37 +345,30 @@ function ApiConfiguration({ selectedCollection, setApiConfig }) {
   };
 
   const handleFieldMappingChange = (key, selectedField) => {
-    console.log('Updating payload key:', key, 'with selected field:', selectedField);
-    console.log('Current specialFieldName:', specialFieldName);
-  
+
     setFieldMappings((prev) => {
-      // Always work with a defined array for specialFields
+
       const updatedSpecialFields = prev.specialFields ? [...prev.specialFields] : [];
-  
-      // Find the index of the special field to update
+
       const specialFieldIndex = updatedSpecialFields.findIndex(field => field.fieldName === specialFieldName);
-  
+
       if (specialFieldIndex !== -1) {
-        // Update existing special field
         const updatedPayload = { ...updatedSpecialFields[specialFieldIndex].payload };
         updatedPayload[key] = selectedField;
-  
+
         updatedSpecialFields[specialFieldIndex] = {
           ...updatedSpecialFields[specialFieldIndex],
           payload: updatedPayload,
         };
       } else {
-        // Add new special field if it doesn't exist
-        console.log('Special field not found. Adding a new special field:', specialFieldName);
-        const newPayload = { [key]: selectedField }; // Create a new payload with the current key and selected field
-  
+        const newPayload = { [key]: selectedField };
         updatedSpecialFields.push({
-          section: 'headers', // Assuming 'headers' as the default section; modify as needed
+          section: 'headers',
           fieldName: specialFieldName,
           payload: newPayload,
         });
       }
-  
+
       return {
         ...prev,
         specialFields: updatedSpecialFields,
@@ -560,7 +534,7 @@ function ApiConfiguration({ selectedCollection, setApiConfig }) {
 
       {parsedCommand && (
         <Paper elevation={3} sx={{ p: 2 }}>
-          <Typography variant="h6" gutterBottom>
+          {/* <Typography variant="h6" gutterBottom>
             Parsed Command
           </Typography>
           <Grid container spacing={2}>
@@ -572,7 +546,7 @@ function ApiConfiguration({ selectedCollection, setApiConfig }) {
               <Typography variant="subtitle1">Headers:</Typography>
               <pre>{JSON.stringify(parsedCommand.headers, null, 2)}</pre>
             </Grid>
-          </Grid>
+          </Grid> */}
 
           <Typography variant="h6" gutterBottom sx={{ mt: 2 }}>
             Field Mappings
@@ -598,14 +572,14 @@ function ApiConfiguration({ selectedCollection, setApiConfig }) {
         </Paper>
       )}
 
-      {debugInfo && (
+      {/* {debugInfo && (
         <Paper elevation={3} sx={{ p: 2, mt: 2 }}>
           <Typography variant="h6" gutterBottom>
             Debug Information
           </Typography>
           <pre>{debugInfo}</pre>
         </Paper>
-      )}
+      )} */}
       <SpecialFieldModal
         open={specialFieldModalOpen}
         onClose={handleCloseModal}
@@ -625,6 +599,9 @@ function ApiConfiguration({ selectedCollection, setApiConfig }) {
         jwtToken={jwtToken}
         setJwtToken={setJwtToken}
         handleJwtDecode={handleJwtDecode}
+        jwtCurlCommand={jwtCurlCommand}
+        setJwtCurlCommand={setJwtCurlCommand}
+        handleJwtCurlCommandExecution={handleJwtCurlCommandExecution}
       />
     </Box>
   );

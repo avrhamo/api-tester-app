@@ -10,3 +10,10 @@ curl -X 'GET' \
   -H 'accept: */*' \
   -H 'email: asdasd' \
   --header 'someEncodedField: ewogICAgImZpcnN0IjogIldpbGxpYW0iLAogICAgImxhc3QiOiAiSm9obnNvbiIsCiAgICAiZnVsbCI6ICJXaWxsaWFtIEpvaG5zb24iCn0='
+
+
+  {"alg":"HS256","typ":"JWT"}.
+  {"sub":null,"iss":"your-app-name","iat":1726641543,"exp":1726645143}.
+  P6lA_uUv5R3bK0jNdkivdybuhn-s_DsOIIa9n2Jp6QE
+
+{"sub":"jwt dummy","iss":"your-app-name","iat":1726676445,"exp":1726680045,"email":"James@example.com","phone":"+678 678-34-73287","birthdate":null}

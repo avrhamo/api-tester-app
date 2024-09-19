@@ -83,7 +83,9 @@ const mapDataToRequest = (mongoData, fieldMappings) => {
       });
 
       // Encode the modified payload back to base64
-      const encodedPayload = btoa(JSON.stringify(modifiedPayload));
+      // const encodedPayload = btoa(JSON.stringify(modifiedPayload));
+      const encodedPayload = section === 'jwt' ? jwtEncode(modifiedPayload) : btoa(JSON.stringify(modifiedPayload));
+
 
       // Add the encoded payload to the appropriate section
       if (section === 'headers') {
